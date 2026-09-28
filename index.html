@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Do you love me?</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #090204; overflow: hidden; }
+  canvas {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    opacity: 0; pointer-events: none; z-index: 1; transition: opacity 1.5s;
+  }
+  canvas.show { opacity: 1; pointer-events: auto; }
+  #quiz {
+    position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 36px; padding: 24px; padding-top: calc(24px + env(safe-area-inset-top, 0px)); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box;
+    text-align: center; font-family: Georgia, serif; color: #d1122b;
+  }
+  #quiz.hide { display: none; }
+  h1 { margin: 0; font-size: clamp(28px, 8vw, 52px); font-weight: 400; text-shadow: 0 0 24px #7a0010; }
+  .row { display: flex; gap: 20px; }
+  button {
+    font: 600 20px Georgia, serif; padding: 16px 38px; border-radius: 999px;
+    border: 2px solid #b0001a; cursor: pointer; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #yes { background: #b0001a; color: #fff; }
+  #no  { background: transparent; color: #d1122b; }
+  button:active { transform: scale(.95); }
+  #msg {
+    position: fixed; z-index: 3; top: calc(9% + env(safe-area-inset-top, 0px)); width: 100%;
+    text-align: center; font: 400 clamp(30px, 9vw, 56px) Georgia, serif; color: #e0142f;
+    text-shadow: 0 0 26px #8a0012; pointer-events: none; opacity: 0; transition: opacity 2s 1s;
+  }
+  #msg.show { opacity: 1; }
+  #hint { position: fixed; z-index: 3; bottom: calc(6% + env(safe-area-inset-bottom, 0px)); width: 100%; text-align: center; color: #8f0016;
+          font: 600 16px system-ui, sans-serif; pointer-events: none; opacity: 0; transition: opacity 2s 2s; }
+  #hint.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="quiz">
+  <h1 id="q">Do you love me?</h1>
+  <div class="row">
+    <button id="yes" type="button">Yes</button>
+    <button id="no" type="button">No</button>
+  </div>
+</div>
+<canvas id="c"></canvas>
+<div id="msg">I love you 3000</div>
+<div id="hint">tap to make it burst</div>
+
+<script>
+// ---------- Quiz ----------
+const q = document.getElementById('q');
+const canvasEl = document.getElementById('c');
+let burst = 0;
+
+document.getElementById('yes').addEventListener('click', () => {
+  document.getElementById('quiz').classList.add('hide');
+  canvasEl.classList.add('show');
+  document.getElementById('hint').classList.add('show');
+  document.getElementById('msg').classList.add('show');
+  burst = 1;
+});
+
+// "No" keeps asking, again and again
+const doubts = [
+  "Are you sure?",
+  "Are you really sure?",
+  "Are you 100% sure?",
+  "Think again...",
+  "Are you absolutely sure?",
+  "Really really sure?"
+];
+let n = 0;
+document.getElementById('no').addEventListener('click', () => {
+  q.textContent = doubts[n % doubts.length];
+  n++;
+});
+
+// ---------- Heart ----------
+const ctx = canvasEl.getContext('2d');
+let W, H, S;
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  W = canvasEl.width = innerWidth * dpr;
+  H = canvasEl.height = innerHeight * dpr;
+  S = Math.min(W, H) / 40;
+}
+addEventListener('resize', resize);
+resize();
+
+function heartPoint(t) {
+  return {
+    x: 16 * Math.pow(Math.sin(t), 3),
+    y: -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+  };
+}
+
+const COUNT = 1400;
+const particles = [];
+for (let i = 0; i < COUNT; i++) {
+  const t = Math.random() * Math.PI * 2;
+  const p = heartPoint(t);
+  const fill = Math.sqrt(Math.random());
+  particles.push({
+    bx: p.x * fill, by: p.y * fill,
+    x: (Math.random() - .5) * W + W / 2, y: (Math.random() - .5) * H + H / 2,
+    vx: 0, vy: 0,
+    size: Math.random() * 2 + .8,
+    hue: (355 + Math.random() * 10) % 360,   // blood red
+    light: 28 + Math.random() * 14,
+    phase: Math.random() * Math.PI * 2
+  });
+}
+
+canvasEl.addEventListener('pointerdown', () => { burst = 1; });
+
+function frame(time) {
+  const beat = 1 + .08 * Math.pow(Math.sin(time / 260), 8) + .04 * Math.sin(time / 260);
+  ctx.fillStyle = 'rgba(9, 2, 4, .22)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (const p of particles) {
+    const tx = W / 2 + p.bx * S * beat + Math.sin(time / 500 + p.phase) * 2;
+    const ty = H / 2 + p.by * S * beat + S + Math.cos(time / 500 + p.phase) * 2;
+    if (burst > 0) {
+      p.vx += (Math.random() - .5) * 40 * burst;
+      p.vy += (Math.random() - .5) * 40 * burst;
+    }
+    p.vx += (tx - p.x) * .012;
+    p.vy += (ty - p.y) * .012;
+    p.vx *= .9; p.vy *= .9;
+    p.x += p.vx; p.y += p.vy;
+
+    ctx.fillStyle = `hsla(${p.hue}, 95%, ${p.light}%, .85)`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  burst *= .8;
+  if (burst < .02) burst = 0;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
